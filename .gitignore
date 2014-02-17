@@ -12,3 +12,7 @@ Makefile
 .cproject
 .project
 
+/buildclient
+/buildlua
+/buildserver
+/.settings
