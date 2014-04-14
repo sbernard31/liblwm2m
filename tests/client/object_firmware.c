@@ -44,7 +44,7 @@ Julien Vermillard <jvermillar@sierrawireless.com>
  * 5 update result             read
  */
 
-#include "core/liblwm2m.h"
+#include "liblwm2m.h"
 
 
 #include <stdio.h>
@@ -104,8 +104,6 @@ static int prv_get_object_tlv(char ** bufferP,
 {
     int length = 0;
     int result;
-    char temp_buffer[16];
-    int temp_length;
 
     *bufferP = (uint8_t *)malloc(PRV_TLV_BUFFER_SIZE);
 

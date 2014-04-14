@@ -127,7 +127,7 @@ typedef enum
 } lwm2m_tlv_type_t;
 
 /*
- * These utility functions fill the buffer with a TLV record containig
+ * These utility functions fill the buffer with a TLV record containing
  * the data. They return the size in bytes of the TLV record, 0 in case
  * of error.
  */
@@ -266,11 +266,11 @@ typedef void (*lwm2m_result_callback_t) (uint16_t clientID, lwm2m_uri_t * uriP, 
 typedef struct _lwm2m_observation_
 {
     struct _lwm2m_observation_ * next;  // matches lwm2m_list_t::next
-    uint16_t                 id;        // matches lwm2m_list_t::id
-    lwm2m_uri_t uri;
-    lwm2m_status_t    status;
+    uint16_t                     id;    // matches lwm2m_list_t::id
+    struct _lwm2m_client_ * clientP;
+    lwm2m_uri_t             uri;
     lwm2m_result_callback_t callback;
-    void * userData;
+    void *                  userData;
 } lwm2m_observation_t;
 
 /*
@@ -398,10 +398,10 @@ void lwm2m_close(lwm2m_context_t * contextP);
 // perform any required pending operation and adjust timeoutP to the maximal time interval to wait.
 int lwm2m_step(lwm2m_context_t * contextP, struct timeval * timeoutP);
 // dispatch received data to liblwm2m
-int lwm2m_handle_packet(lwm2m_context_t * contextP, uint8_t * buffer, int length, void * fromSessionH);
+void lwm2m_handle_packet(lwm2m_context_t * contextP, uint8_t * buffer, int length, void * fromSessionH);
 
 #ifdef LWM2M_CLIENT_MODE
-int lwm2m_set_bootstrap_server(lwm2m_context_t * contextP, lwm2m_bootstrap_server_t * serverP);
+void lwm2m_set_bootstrap_server(lwm2m_context_t * contextP, lwm2m_bootstrap_server_t * serverP);
 int lwm2m_add_server(lwm2m_context_t * contextP, uint16_t shortID, void * sessionH, lwm2m_security_t * securityP);
 
 // send registration message to all known LWM2M Servers.

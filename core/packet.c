@@ -69,19 +69,6 @@ Contains code snippets which are:
 #include <stdio.h>
 
 
-static int prv_check_addr(void * leftSessionH,
-                          void * rightSessionH)
-{
-    if ((leftSessionH == NULL)
-     || (rightSessionH == NULL)
-     || (leftSessionH != rightSessionH))
-    {
-        return 0;
-    }
-
-    return 1;
-}
-
 static void handle_reset(lwm2m_context_t * contextP,
                          void * fromSessionH,
                          coap_packet_t * message)
@@ -89,38 +76,6 @@ static void handle_reset(lwm2m_context_t * contextP,
 #ifdef LWM2M_CLIENT_MODE
     cancel_observe(contextP, message->mid, fromSessionH);
 #endif
-}
-
-static void handle_response(lwm2m_context_t * contextP,
-                            lwm2m_transaction_t * transacP,
-                            void * fromSessionH,
-                            coap_packet_t * message)
-{
-    void * targetSessionH;
-
-    switch (transacP->peerType)
-    {
-#ifdef LWM2M_SERVER_MODE
-    case ENDPOINT_CLIENT:
-        targetSessionH = ((lwm2m_client_t *)transacP->peerP)->sessionH;
-        break;
-#endif
-
-#ifdef LWM2M_CLIENT_MODE
-    case ENDPOINT_SERVER:
-        targetSessionH = ((lwm2m_server_t *)transacP->peerP)->sessionH;
-        break;
-#endif
-
-    default:
-        return;
-    }
-
-    if (prv_check_addr(fromSessionH, targetSessionH))
-    {
-        transacP->callback(transacP, message);
-        transaction_remove(contextP, transacP);
-    }
 }
 
 static coap_status_t handle_request(lwm2m_context_t * contextP,
@@ -164,6 +119,7 @@ static coap_status_t handle_request(lwm2m_context_t * contextP,
         result = NO_ERROR;
     }
 
+    lwm2m_free( uriP);
     return result;
 }
 
@@ -171,7 +127,7 @@ static coap_status_t handle_request(lwm2m_context_t * contextP,
  * Erbium is Copyright (c) 2013, Institute for Pervasive Computing, ETH Zurich
  * All rights reserved.
  */
-int lwm2m_handle_packet(lwm2m_context_t * contextP,
+void lwm2m_handle_packet(lwm2m_context_t * contextP,
                         uint8_t * buffer,
                         int length,
                         void * fromSessionH)
@@ -179,8 +135,6 @@ int lwm2m_handle_packet(lwm2m_context_t * contextP,
     coap_status_t coap_error_code = NO_ERROR;
     static coap_packet_t message[1];
     static coap_packet_t response[1];
-    uint8_t pktBuffer[COAP_MAX_PACKET_SIZE+1];
-    size_t pktBufferLen = 0;
 
     coap_error_code = coap_parse_message(message, buffer, (uint16_t)length);
     if (coap_error_code==NO_ERROR)
@@ -290,19 +244,21 @@ int lwm2m_handle_packet(lwm2m_context_t * contextP,
                 handle_reset(contextP, fromSessionH, message);
             }
 
-            transaction = (lwm2m_transaction_t *)lwm2m_list_find((lwm2m_list_t *)contextP->transactionList, message->mid);
-            if (NULL != transaction)
-            {
-                handle_response(contextP, transaction, fromSessionH, message);
-            }
 #ifdef LWM2M_SERVER_MODE
-            else if (message->code = COAP_204_CHANGED
-                  && IS_OPTION(message, COAP_OPTION_OBSERVE))
+            if (message->code == COAP_204_CHANGED
+             && IS_OPTION(message, COAP_OPTION_OBSERVE))
             {
                 handle_observe_notify(contextP, fromSessionH, message);
             }
+            else
 #endif
+            {
+                transaction_handle_response(contextP, fromSessionH, message);
+            }
         } /* Request or Response */
+
+        coap_free_header(message);
+
     } /* if (parsed correctly) */
     else
     {

@@ -33,11 +33,12 @@ David Navarro <david.navarro@intel.com>
  * manufacturer, model, etc...
  */
 
-#include "core/liblwm2m.h"
+#include "liblwm2m.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 
 
 #define PRV_MANUFACTURER      "Open Mobile Alliance"
@@ -572,7 +573,7 @@ static uint8_t prv_device_execute(lwm2m_uri_t * uriP,
     case 5:
         fprintf(stdout, "\n\t FACTORY RESET\r\n\n");
         return COAP_204_CHANGED;
-    case 10:
+    case 12:
         fprintf(stdout, "\n\t RESET ERROR CODE\r\n\n");
         return COAP_204_CHANGED;
     default:

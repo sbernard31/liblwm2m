@@ -46,7 +46,6 @@ David Navarro <david.navarro@intel.com>
 static void prv_handleRegistrationReply(lwm2m_transaction_t * transacP,
                                         void * message)
 {
-    lwm2m_context_t * contextP = (lwm2m_context_t *)transacP->userData;
     lwm2m_server_t * targetP;
     coap_packet_t * packet = (coap_packet_t *)message;
 
@@ -128,6 +127,8 @@ int lwm2m_register(lwm2m_context_t * contextP)
 
         targetP = targetP->next;
     }
+
+    lwm2m_free(query);
 
     return 0;
 }
@@ -370,7 +371,7 @@ coap_status_t handle_registration_request(lwm2m_context_t * contextP,
         lwm2m_client_t * clientP;
         char location[MAX_LOCATION_LENGTH];
 
-        if (uriP->flag & LWM2M_URI_MASK_ID != 0) return COAP_400_BAD_REQUEST;
+        if ((uriP->flag & LWM2M_URI_MASK_ID) != 0) return COAP_400_BAD_REQUEST;
         prv_getParameters(message->uri_query, &name);
         if (name == NULL) return COAP_400_BAD_REQUEST;
         objects = prv_decodeRegisterPayload(message->payload, message->payload_len);
@@ -409,7 +410,11 @@ coap_status_t handle_registration_request(lwm2m_context_t * contextP,
             prv_freeClient(clientP);
             return COAP_500_INTERNAL_SERVER_ERROR;
         }
-        coap_set_header_location_path(response, location);
+        if (coap_set_header_location_path(response, location) == 0)
+        {
+            prv_freeClient(clientP);
+            return COAP_500_INTERNAL_SERVER_ERROR;
+        }
 
         if (contextP->monitorCallback != NULL)
         {
@@ -427,7 +432,7 @@ coap_status_t handle_registration_request(lwm2m_context_t * contextP,
     {
         lwm2m_client_t * clientP;
 
-        if (uriP->flag & LWM2M_URI_MASK_ID != LWM2M_URI_FLAG_OBJECT_ID) return COAP_400_BAD_REQUEST;
+        if ((uriP->flag & LWM2M_URI_MASK_ID) != LWM2M_URI_FLAG_OBJECT_ID) return COAP_400_BAD_REQUEST;
 
         contextP->clientList = (lwm2m_client_t *)LWM2M_LIST_RM(contextP->clientList, uriP->objectId, &clientP);
         if (clientP == NULL) return COAP_400_BAD_REQUEST;

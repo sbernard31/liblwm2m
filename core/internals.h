@@ -40,9 +40,13 @@ David Navarro <david.navarro@intel.com>
 #include <stddef.h>
 #include <stdbool.h>
 
-#include "externals/er-coap-13/er-coap-13.h"
+#include "er-coap-13/er-coap-13.h"
 
+#ifdef WITH_LOGS
 #define LOG(...) fprintf(stderr, __VA_ARGS__)
+#else
+#define LOG(...)
+#endif
 
 #define LWM2M_MAX_PACKET_SIZE 198
 
@@ -86,6 +90,8 @@ int prv_getRegisterPayload(lwm2m_context_t * contextP, char * buffer, size_t len
 lwm2m_transaction_t * transaction_new(coap_method_t method, lwm2m_uri_t * uriP, uint16_t mID, lwm2m_endpoint_type_t peerType, void * peerP);
 int transaction_send(lwm2m_context_t * contextP, lwm2m_transaction_t * transacP);
 void transaction_free(lwm2m_transaction_t * transacP);
+void transaction_remove(lwm2m_context_t * contextP, lwm2m_transaction_t * transacP);
+void transaction_handle_response(lwm2m_context_t * contextP, void * fromSessionH, coap_packet_t * message);
 
 // defined in management.c
 coap_status_t handle_dm_request(lwm2m_context_t * contextP, lwm2m_uri_t * uriP, void * fromSessionH, coap_packet_t * message, coap_packet_t * response);
