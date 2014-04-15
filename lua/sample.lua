@@ -45,7 +45,7 @@ local sampleObj = {
     write = function (obj, value)
       print("Res15 modification")
       print("before :", obj[15].value," after:",value)
-      obj[15] = value
+      obj[15].value = value
     end
   }
 }
