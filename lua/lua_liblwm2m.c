@@ -24,7 +24,7 @@ THE SOFTWARE.
 #include "lua5.1/lauxlib.h"
 #include "lua5.1/lualib.h"
 
-#include "core/liblwm2m.h"
+#include "liblwm2m.h"
 #include <string.h>
 #include <stdlib.h>
 

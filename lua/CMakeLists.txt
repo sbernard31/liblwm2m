@@ -4,12 +4,16 @@ SET (CMAKE_BUILD_TYPE Debug)
 
 project (lwm2mluaclient)
 
+SET(LIBLWM2M_DIR ${PROJECT_SOURCE_DIR}/../core)
+
 add_definitions(-DLWM2M_CLIENT_MODE)
 
-include_directories (${PROJECT_SOURCE_DIR}/.. ${PROJECT_SOURCE_DIR}/../utils)
+include_directories (${LIBLWM2M_DIR} ${PROJECT_SOURCE_DIR}/../utils)
 
-add_subdirectory(${PROJECT_SOURCE_DIR}/../core ${CMAKE_CURRENT_BINARY_DIR}/core)
+add_subdirectory(${LIBLWM2M_DIR} ${CMAKE_CURRENT_BINARY_DIR}/core)
 
-SET(SOURCES lua_lwm2mclient.c lua_object.c)
+SET(SOURCES lua_liblwm2m.c lua_object.c)
 
-add_library(lwm2m MODULE lua_object.c lua_liblwm2m.c ${CORE_SOURCES} ${EXT_SOURCES})
+
+add_library(lwm2m MODULE ${SOURCES} ${CORE_SOURCES})
+SET_TARGET_PROPERTIES(lwm2m PROPERTIES PREFIX "")

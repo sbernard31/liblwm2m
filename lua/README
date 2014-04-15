@@ -11,7 +11,7 @@ In the any directory [build directory], run the following commands:
 To Test add the .so to your LUA_CPATH env var and use the sample.lua (you need to install luasocket)
 
 For Linux :
-export LUA_CPATH=';;[build directory]/lib?.so'
+export LUA_CPATH=';;[build directory]/?.so'
 lua sample.lua
 
 

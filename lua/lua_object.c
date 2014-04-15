@@ -20,7 +20,7 @@
  THE SOFTWARE.
  */
 
-#include "core/liblwm2m.h"
+#include "liblwm2m.h"
 
 #include <stdio.h>
 #include <stdlib.h>
