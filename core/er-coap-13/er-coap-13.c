@@ -36,12 +36,7 @@
  *      Matthias Kovatsch <kovatsch@inf.ethz.ch>
  */
 
-#ifdef CONTIKI
-#include "contiki.h"
-#include "contiki-net.h"
-#else
 #include <stdlib.h>
-#endif
 
 #include <string.h>
 #include <stdio.h>
@@ -65,9 +60,6 @@
 /*-----------------------------------------------------------------------------------*/
 /*- Variables -----------------------------------------------------------------------*/
 /*-----------------------------------------------------------------------------------*/
-#ifdef CONTIKI
-static struct uip_udp_conn *udp_conn = NULL;
-#endif
 static uint16_t current_mid = 0;
 
 coap_status_t coap_error_code = NO_ERROR;
@@ -260,7 +252,7 @@ coap_merge_multi_option(char **dst, size_t *dst_len, uint8_t *option, size_t opt
 
 static
 void
-coap_add_multi_option(multi_option_t **dst, uint8_t *option, size_t option_len)
+coap_add_multi_option(multi_option_t **dst, uint8_t *option, size_t option_len, uint8_t is_static)
 {
   multi_option_t *opt = (multi_option_t *)lwm2m_malloc(sizeof(multi_option_t));
 
@@ -268,7 +260,21 @@ coap_add_multi_option(multi_option_t **dst, uint8_t *option, size_t option_len)
   {
     opt->next = NULL;
     opt->len = option_len;
-    opt->data = option;
+    if (is_static)
+    {
+      opt->data = option;
+      opt->is_static = 1;
+    }
+    else
+    {
+        opt->data = (char *)lwm2m_malloc(option_len);
+        if (opt->data == NULL)
+        {
+            lwm2m_free(opt);
+            return;
+        }
+        memcpy(opt->data, option, option_len);
+    }
 
     if (*dst)
     {
@@ -293,9 +299,42 @@ free_multi_option(multi_option_t *dst)
   if (dst)
   {
     multi_option_t *n = dst->next;
+    if (dst->is_static == 0)
+    {
+        lwm2m_free(dst->data);
+    }
     lwm2m_free(dst);
     free_multi_option(n);
   }
+}
+
+char * coap_get_multi_option_as_string(multi_option_t * option)
+{
+    size_t len = 0;
+    multi_option_t * opt;
+    char * output;
+
+    for (opt = option; opt != NULL; opt = opt->next)
+    {
+       len += opt->len + 1;     // for separator
+    }
+
+    output = lwm2m_malloc(len + 1);
+    if (output != NULL)
+    {
+        size_t i = 0;
+
+        for (opt = option; opt != NULL; opt = opt->next)
+        {
+            output[i] = '/';
+            i += 1;
+
+            memmove(output + i, opt->data, opt->len);
+            i += opt->len;
+        }
+    }
+
+    return output;
 }
 
 /*-----------------------------------------------------------------------------------*/
@@ -335,23 +374,6 @@ coap_get_variable(const char *buffer, size_t length, const char *name, const cha
 
   return 0;
 }
-/*-----------------------------------------------------------------------------------*/
-/*- MEASSAGE SENDING ----------------------------------------------------------------*/
-/*-----------------------------------------------------------------------------------*/
-
-#ifdef CONTIKI
-void
-coap_init_connection(uint16_t port)
-{
-  /* new connection with remote host */
-  udp_conn = udp_new(NULL, 0, NULL);
-  udp_bind(udp_conn, port);
-  PRINTF("Listening on port %u\n", uip_ntohs(udp_conn->lport));
-
-  /* Initialize transaction ID. */
-  current_mid = random_rand();
-}
-#endif
 
 /*-----------------------------------------------------------------------------------*/
 uint16_t
@@ -380,12 +402,9 @@ coap_free_header(void *packet)
 {
     coap_packet_t *const coap_pkt = (coap_packet_t *) packet;
 
-    if (coap_pkt->location_path != NULL)
-    {
-        lwm2m_free(coap_pkt->location_path);
-    }
     free_multi_option(coap_pkt->uri_path);
     free_multi_option(coap_pkt->uri_query);
+    free_multi_option(coap_pkt->location_path);
 }
 
 /*-----------------------------------------------------------------------------------*/
@@ -434,7 +453,7 @@ coap_serialize_message(void *packet, uint8_t *buffer)
   COAP_SERIALIZE_INT_OPTION(    COAP_OPTION_IF_NONE_MATCH,  content_type-coap_pkt->content_type, "If-None-Match") /* hack to get a zero field */
   COAP_SERIALIZE_INT_OPTION(    COAP_OPTION_OBSERVE,        observe, "Observe")
   COAP_SERIALIZE_INT_OPTION(    COAP_OPTION_URI_PORT,       uri_port, "Uri-Port")
-  COAP_SERIALIZE_STRING_OPTION( COAP_OPTION_LOCATION_PATH,  location_path, '/', "Location-Path")
+  COAP_SERIALIZE_MULTI_OPTION(  COAP_OPTION_LOCATION_PATH,  location_path, "Location-Path")
   COAP_SERIALIZE_MULTI_OPTION(  COAP_OPTION_URI_PATH,       uri_path, "Uri-Path")
   COAP_SERIALIZE_INT_OPTION(    COAP_OPTION_CONTENT_TYPE,   content_type, "Content-Format")
   COAP_SERIALIZE_INT_OPTION(    COAP_OPTION_MAX_AGE,        max_age, "Max-Age")
@@ -486,23 +505,6 @@ coap_serialize_message(void *packet, uint8_t *buffer)
 
   return (option - buffer) + coap_pkt->payload_len; /* packet length */
 }
-/*-----------------------------------------------------------------------------------*/
-#ifdef CONTIKI
-void
-coap_send_message(uip_ipaddr_t *addr, uint16_t port, uint8_t *data, uint16_t length)
-{
-  /* Configure connection to reply to client */
-  uip_ipaddr_copy(&udp_conn->ripaddr, addr);
-  udp_conn->rport = port;
-
-  uip_udp_packet_send(udp_conn, data, length);
-  PRINTF("-sent UDP datagram (%u)-\n", length);
-
-  /* Restore server connection to allow data from any node */
-  memset(&udp_conn->ripaddr, 0, sizeof(udp_conn->ripaddr));
-  udp_conn->rport = 0;
-}
-#endif
 /*-----------------------------------------------------------------------------------*/
 coap_status_t
 coap_parse_message(void *packet, uint8_t *data, uint16_t data_len)
@@ -665,31 +667,18 @@ coap_parse_message(void *packet, uint8_t *data, uint16_t data_len)
       case COAP_OPTION_URI_PATH:
         /* coap_merge_multi_option() operates in-place on the IPBUF, but final packet field should be const string -> cast to string */
         // coap_merge_multi_option( (char **) &(coap_pkt->uri_path), &(coap_pkt->uri_path_len), current_option, option_length, 0);
-        coap_add_multi_option( &(coap_pkt->uri_path), current_option, option_length);
+        coap_add_multi_option( &(coap_pkt->uri_path), current_option, option_length, 1);
         PRINTF("Uri-Path [%.*s]\n", coap_pkt->uri_path_len, coap_pkt->uri_path);
         break;
       case COAP_OPTION_URI_QUERY:
         /* coap_merge_multi_option() operates in-place on the IPBUF, but final packet field should be const string -> cast to string */
         // coap_merge_multi_option( (char **) &(coap_pkt->uri_query), &(coap_pkt->uri_query_len), current_option, option_length, '&');
-        coap_add_multi_option( &(coap_pkt->uri_query), current_option, option_length);
+        coap_add_multi_option( &(coap_pkt->uri_query), current_option, option_length, 1);
         PRINTF("Uri-Query [%.*s]\n", coap_pkt->uri_query_len, coap_pkt->uri_query);
         break;
 
       case COAP_OPTION_LOCATION_PATH:
-        {
-          char * tmp_buf = NULL;
-          size_t tmp_len = 0;
-
-          /* coap_merge_multi_option() operates in-place on the IPBUF, but final packet field should be const string -> cast to string */
-          coap_merge_multi_option( &tmp_buf, &tmp_len, current_option, option_length, '/');
-          if (tmp_len != 0)
-          {
-            coap_pkt->location_path =(char *)lwm2m_malloc(tmp_len);
-            memcpy(coap_pkt->location_path, tmp_buf, tmp_len);
-            coap_pkt->location_path_len = tmp_len;
-          }
-          PRINTF("Location-Path [%.*s]\n", coap_pkt->location_path_len, coap_pkt->location_path);
-        }
+        coap_add_multi_option( &(coap_pkt->location_path), current_option, option_length, 1);
         break;
       case COAP_OPTION_LOCATION_QUERY:
         /* coap_merge_multi_option() operates in-place on the IPBUF, but final packet field should be const string -> cast to string */
@@ -1017,7 +1006,7 @@ coap_set_header_uri_path(void *packet, const char *path)
       int i = 0;
 
       while (path[i] != 0 && path[i] != '/') i++;
-      coap_add_multi_option(&(coap_pkt->uri_path), (uint8_t *)path, i);
+      coap_add_multi_option(&(coap_pkt->uri_path), (uint8_t *)path, i, 0);
 
       if (path[i] == '/') i++;
       path += i;
@@ -1036,13 +1025,13 @@ coap_set_header_uri_path_segment(void *packet, const char *segment)
 
   if (segment == NULL || segment[0] == 0)
   {
-      coap_add_multi_option(&(coap_pkt->uri_path), NULL, 0);
+      coap_add_multi_option(&(coap_pkt->uri_path), NULL, 0, 1);
       length = 0;
   }
   else
   {
       length = strlen(segment);
-      coap_add_multi_option(&(coap_pkt->uri_path), (uint8_t *)segment, length);
+      coap_add_multi_option(&(coap_pkt->uri_path), (uint8_t *)segment, length, 0);
   }
 
   SET_OPTION(coap_pkt, COAP_OPTION_URI_PATH);
@@ -1076,7 +1065,7 @@ coap_set_header_uri_query(void *packet, const char *query)
         int i = 0;
 
         while (query[i] != 0 && query[i] != '&') i++;
-        coap_add_multi_option(&(coap_pkt->uri_query), (uint8_t *)query, i);
+        coap_add_multi_option(&(coap_pkt->uri_query), (uint8_t *)query, i, 0);
 
         if (query[i] == '&') i++;
         query += i;
@@ -1094,37 +1083,35 @@ coap_get_header_location_path(void *packet, const char **path)
 
   if (!IS_OPTION(coap_pkt, COAP_OPTION_LOCATION_PATH)) return 0;
 
-  *path = coap_pkt->location_path;
-  return coap_pkt->location_path_len;
+  *path = NULL; //coap_pkt->location_path;
+  return 0; //coap_pkt->location_path_len;
 }
 
 int
 coap_set_header_location_path(void *packet, const char *path)
 {
-  coap_packet_t *const coap_pkt = (coap_packet_t *) packet;
+    coap_packet_t *coap_pkt = (coap_packet_t *) packet;
+    int length = 0;
 
-  char *query;
+    free_multi_option(coap_pkt->location_path);
+    coap_pkt->location_path = NULL;
 
-  while (path[0]=='/') ++path;
+    if (path[0]=='/') ++path;
 
-  if ((query = strchr(path, '?')))
-  {
-    coap_set_header_location_query(packet, query+1);
-    coap_pkt->location_path_len = query - path;
-  }
-  else
-  {
-    coap_pkt->location_path_len = strlen(path);
-  }
+    do
+    {
+        int i = 0;
 
-  coap_pkt->location_path = strdup(path);
-  if (coap_pkt->location_path==NULL)
-  {
-      return 0;
-  }
+        while (path[i] != 0 && path[i] != '/') i++;
+        coap_add_multi_option(&(coap_pkt->location_path), (uint8_t *)path, i, 0);
 
-  SET_OPTION(coap_pkt, COAP_OPTION_LOCATION_PATH);
-  return coap_pkt->location_path_len;
+        if (path[i] == '/') i++;
+        path += i;
+        length += i;
+    } while (path[0] != 0);
+
+    SET_OPTION(coap_pkt, COAP_OPTION_LOCATION_PATH);
+    return length;
 }
 /*-----------------------------------------------------------------------------------*/
 int
