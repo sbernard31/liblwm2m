@@ -58,115 +58,202 @@ coap_status_t object_read(lwm2m_context_t * contextP,
                           char ** bufferP,
                           int * lengthP)
 {
-    lwm2m_object_t * targetP;
-
-    targetP = prv_find_object(contextP, uriP->objectId);
-
-    if (NULL == targetP)
+    switch (uriP->objectId)
     {
+    case LWM2M_SECURITY_OBJECT_ID:
         return NOT_FOUND_4_04;
-    }
-    if (NULL == targetP->readFunc)
-    {
-        return METHOD_NOT_ALLOWED_4_05;
-    }
 
-    return targetP->readFunc(uriP, bufferP, lengthP, targetP);
+    case LWM2M_SERVER_OBJECT_ID:
+        return object_server_read(contextP, uriP, bufferP, lengthP);
+
+    default:
+        {
+            lwm2m_object_t * targetP;
+
+            targetP = prv_find_object(contextP, uriP->objectId);
+
+            if (NULL == targetP)
+            {
+                return NOT_FOUND_4_04;
+            }
+            if (NULL == targetP->readFunc)
+            {
+                return METHOD_NOT_ALLOWED_4_05;
+            }
+
+            return targetP->readFunc(uriP, bufferP, lengthP, targetP);
+        }
+    }
 }
-
 
 coap_status_t object_write(lwm2m_context_t * contextP,
                            lwm2m_uri_t * uriP,
                            char * buffer,
                            int length)
 {
-    lwm2m_object_t * targetP;
+    switch (uriP->objectId)
+    {
+    case LWM2M_SECURITY_OBJECT_ID:
+        return NOT_FOUND_4_04;
 
-    if (0 == (uriP->flag & LWM2M_URI_FLAG_INSTANCE_ID))
+    case LWM2M_SERVER_OBJECT_ID:
+        return object_server_write(contextP, uriP, buffer, length);
+
+    default:
+        {
+            lwm2m_object_t * targetP;
+
+            targetP = prv_find_object(contextP, uriP->objectId);
+
+            if (NULL == targetP)
+            {
+                return NOT_FOUND_4_04;
+            }
+            if (NULL == targetP->writeFunc)
+            {
+                return METHOD_NOT_ALLOWED_4_05;
+            }
+
+            return targetP->writeFunc(uriP, buffer, length, targetP);
+        }
+    }
+}
+
+coap_status_t object_execute(lwm2m_context_t * contextP,
+                             lwm2m_uri_t * uriP,
+                             char * buffer,
+                             int length)
+{
+    switch (uriP->objectId)
+    {
+    case LWM2M_SECURITY_OBJECT_ID:
+        return NOT_FOUND_4_04;
+
+    case LWM2M_SERVER_OBJECT_ID:
+        return object_server_execute(contextP, uriP, buffer, length);
+
+    default:
+        {
+            lwm2m_object_t * targetP;
+
+            targetP = prv_find_object(contextP, uriP->objectId);
+
+            if (NULL == targetP)
+            {
+                return NOT_FOUND_4_04;
+            }
+
+            if (NULL == targetP->executeFunc)
+            {
+                return METHOD_NOT_ALLOWED_4_05;
+            }
+
+            return targetP->executeFunc(uriP, buffer, length, targetP);
+        }
+    }
+}
+
+coap_status_t object_create(lwm2m_context_t * contextP,
+                            lwm2m_uri_t * uriP,
+                            char * buffer,
+                            int length)
+{
+    if (length == 0 || buffer == 0)
     {
         return BAD_REQUEST_4_00;
     }
 
-    targetP = prv_find_object(contextP, uriP->objectId);
-
-    if (NULL == targetP)
+    switch (uriP->objectId)
     {
-        return NOT_FOUND_4_04;
-    }
-    if (NULL == targetP->writeFunc)
-    {
-        return METHOD_NOT_ALLOWED_4_05;
-    }
+    case LWM2M_SECURITY_OBJECT_ID:
+        return object_security_create(contextP, uriP, buffer, length);
 
-    return targetP->writeFunc(uriP, buffer, length, targetP);
-}
+    case LWM2M_SERVER_OBJECT_ID:
+        return object_server_create(contextP, uriP, buffer, length);
 
-coap_status_t object_create_execute(lwm2m_context_t * contextP,
-                                    lwm2m_uri_t * uriP,
-                                    char * buffer,
-                                    int length)
-{
-    lwm2m_object_t * targetP;
-
-    targetP = prv_find_object(contextP, uriP->objectId);
-
-    if (NULL == targetP)
-    {
-        return NOT_FOUND_4_04;
-    }
-
-    if ((uriP->flag & LWM2M_URI_FLAG_INSTANCE_ID) != 0
-     && (uriP->flag & LWM2M_URI_FLAG_RESOURCE_ID) != 0)
-    {
-        // This is an execute
-        if (NULL == targetP->executeFunc)
+    default:
         {
-            return METHOD_NOT_ALLOWED_4_05;
-        }
+            lwm2m_object_t * targetP;
 
-        return targetP->executeFunc(uriP, buffer, length, targetP);
-    }
-    else if ((uriP->flag & LWM2M_URI_FLAG_RESOURCE_ID) == 0
-          && length != 0)
-    {
-        // This is a create
-        if (length == 0 || buffer == 0)
-        {
-            return BAD_REQUEST_4_00;
-        }
-        if (NULL == targetP->createFunc)
-        {
-            return METHOD_NOT_ALLOWED_4_05;
-        }
+            targetP = prv_find_object(contextP, uriP->objectId);
 
-        return targetP->createFunc(uriP, buffer, length, targetP);
+            if (NULL == targetP)
+            {
+                return NOT_FOUND_4_04;
+            }
+
+            if (NULL == targetP->createFunc)
+            {
+                return METHOD_NOT_ALLOWED_4_05;
+            }
+
+            return targetP->createFunc(uriP, buffer, length, targetP);
+        }
     }
-    else return BAD_REQUEST_4_00;
 }
 
 coap_status_t object_delete(lwm2m_context_t * contextP,
                             lwm2m_uri_t * uriP)
 {
-    lwm2m_object_t * targetP;
-
-    if ((uriP->flag & LWM2M_URI_FLAG_INSTANCE_ID) == 0
-     || (uriP->flag & LWM2M_URI_FLAG_RESOURCE_ID) != 0)
+    switch (uriP->objectId)
     {
-        return BAD_REQUEST_4_00;
+    case LWM2M_SECURITY_OBJECT_ID:
+        return object_security_delete(contextP, uriP);
+
+    case LWM2M_SERVER_OBJECT_ID:
+        return object_server_delete(contextP, uriP);
+
+    default:
+        {
+            lwm2m_object_t * targetP;
+
+            targetP = prv_find_object(contextP, uriP->objectId);
+
+            if (NULL == targetP)
+            {
+                return NOT_FOUND_4_04;
+            }
+            if (NULL == targetP->deleteFunc)
+            {
+                return METHOD_NOT_ALLOWED_4_05;
+            }
+
+            return targetP->deleteFunc(uriP->instanceId, targetP);
+        }
+    }
+}
+
+bool object_isInstanceNew(lwm2m_context_t * contextP,
+                          uint16_t objectId,
+                          uint16_t instanceId)
+{
+    switch (objectId)
+    {
+    case LWM2M_SECURITY_OBJECT_ID:
+    case LWM2M_SERVER_OBJECT_ID:
+        if (NULL != lwm2m_list_find((lwm2m_list_t *)contextP->serverList, instanceId))
+        {
+            return false;
+        }
+        break;
+
+    default:
+        {
+            lwm2m_object_t * targetP;
+
+            targetP = prv_find_object(contextP, objectId);
+            if (targetP != NULL)
+            {
+                if (NULL != lwm2m_list_find(targetP->instanceList, instanceId))
+                {
+                    return false;
+                }
+            }
+        }
+        break;
     }
 
-    targetP = prv_find_object(contextP, uriP->objectId);
-
-    if (NULL == targetP)
-    {
-        return NOT_FOUND_4_04;
-    }
-    if (NULL == targetP->deleteFunc)
-    {
-        return METHOD_NOT_ALLOWED_4_05;
-    }
-
-    return targetP->deleteFunc(uriP->instanceId, targetP);
+    return true;
 }
 
 int prv_getRegisterPayload(lwm2m_context_t * contextP,
@@ -175,15 +262,31 @@ int prv_getRegisterPayload(lwm2m_context_t * contextP,
 {
     int index;
     int i;
+    int result;
+
+    lwm2m_server_t * serverP;
 
     // index can not be greater than length
     index = 0;
+    for (serverP = contextP->serverList;
+         serverP != NULL;
+         serverP = serverP->next)
+    {
+        result = snprintf(buffer + index, length - index, "</%hu/%hu>,", LWM2M_SERVER_OBJECT_ID, serverP->shortID);
+        if (result > 0 && result <= length - index)
+        {
+            index += result;
+        }
+        else
+        {
+            return 0;
+        }
+    }
+
     for (i = 0 ; i < contextP->numObject ; i++)
     {
         if (contextP->objectList[i]->instanceList == NULL)
         {
-            int result;
-
             result = snprintf(buffer + index, length - index, "</%hu>,", contextP->objectList[i]->objID);
             if (result > 0 && result <= length - index)
             {
