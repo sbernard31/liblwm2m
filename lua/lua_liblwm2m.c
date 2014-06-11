@@ -225,20 +225,27 @@ static int llwm_handle(lua_State *L) {
 	char* host = luaL_checkstring(L, 3);
 	int port = luaL_checkint(L, 4);
 
-	// Create struct to store it.
-	size_t lal = sizeof(struct llwm_addr_t);
-	llwm_addr_t * la = (llwm_addr_t*) malloc(lal);
-	if (la == NULL)
-		return luaL_error(L, "Memory allocation problem when 'handle'");
-	la->host = strdup(host);
-	la->port = port;
+	// HACK : https://github.com/01org/liblwm2m/pull/18#issuecomment-45501037
+	// find session object in the server list.
+	lwm2m_server_t * targetP;
+	llwm_addr_t * la = NULL;
+	bool found = false;
+	targetP = lwu->ctx->serverList;
+	while (targetP != NULL && !found) {
+		// get host and port of the target
+		llwm_addr_t * session = (llwm_addr_t *) targetP->sessionH;
+		if (session != NULL && session->port == port
+				&& strcmp(session->host, host) == 0) {
+			la = session;
+			found = true;
+		} else {
+			targetP = targetP->next;
+		}
+	}
 
 	// Handle packet
-	lwm2m_handle_packet(lwu->ctx, buffer, length, la);
-
-	// Free address struct memory.
-	free(la->host);
-	free(la);
+	if (found)
+		lwm2m_handle_packet(lwu->ctx, buffer, length, la);
 
 	return 0;
 }
@@ -253,6 +260,28 @@ static int llwm_step(lua_State *L) {
 	tv.tv_usec = 0;
 	lwm2m_step(lwu->ctx, &tv);
 
+	return 0;
+}
+
+static int llwm_resource_changed(lua_State *L) {
+	// Get llwm userdata.
+	llwm_userdata *lwu = checkllwm(L, "resource_changed");
+
+	// Get parameters.
+	size_t length;
+	uint8_t * uriPath = (uint8_t*) luaL_checklstring(L, 2, &length);
+
+	// Create URI of resource which changed.
+	lwm2m_uri_t uri;
+	int result = lwm2m_stringToUri(uriPath, length, &uri);
+	if (result == 0){
+		lua_pushnil(L);
+		lua_pushstring(L,"resource uri syntax error");
+		return 2;
+	}
+
+	//notify the change.
+	lwm2m_resource_value_changed(lwu->ctx, &uri);
 	return 0;
 }
 
@@ -276,7 +305,8 @@ static int llwm_close(lua_State *L) {
 
 static const struct luaL_Reg llwm_objmeths[] = { { "handle", llwm_handle }, {
 		"addserver", llwm_add_server }, { "register", llwm_register }, {
-		"close", llwm_close }, { "step", llwm_step }, { "__gc", llwm_close }, {
+		"close", llwm_close }, { "step", llwm_step }, { "resourcechanged",
+		llwm_resource_changed }, { "__gc", llwm_close }, {
 NULL, NULL } };
 
 static const struct luaL_Reg llwm_modulefuncs[] = { { "init", llwm_init }, {
