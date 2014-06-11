@@ -12,7 +12,7 @@ To Test add the .so to your LUA_CPATH env var and use the sample.lua (you need t
 
 For Linux :
 export LUA_CPATH=';;[build directory]/?.so'
-lua sample.lua
+lua simplesample.lua
 
 
 Syntax
