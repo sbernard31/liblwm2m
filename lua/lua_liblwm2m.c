@@ -289,15 +289,16 @@ static int llwm_close(lua_State *L) {
 	// Get llwm userdata
 	llwm_userdata *lwu = checkllwm(L, "close");
 
+	// Close lwm2m context.
+	if (lwu->ctx) {
+		lwm2m_close(lwu->ctx);
+		lwu->ctx->bufferSendUserData = NULL;
+	}
+
 	// Release "send" callback.
 	luaL_unref(L, LUA_REGISTRYINDEX, lwu->sendCallbackRef);
 	lwu->sendCallbackRef = LUA_NOREF;
 
-	// Close lwm2m context.
-	if (lwu->ctx) {
-		lwu->ctx->bufferSendUserData = NULL;
-		lwm2m_close(lwu->ctx);
-	}
 	lwu->ctx = NULL;
 
 	return 0;
