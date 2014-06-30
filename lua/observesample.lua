@@ -2,7 +2,7 @@ local lwm2m = require 'lwm2m'
 local socket = require 'socket'
 
 local udp = socket.udp();
-udp:setsockname('*', 5683)
+udp:setsockname('*', 5682)
 
 local deviceObj = {
   id = 3,
@@ -10,7 +10,8 @@ local deviceObj = {
   [1]  = "Lightweight M2M Client",                 -- model number
   [2]  = "345000123",                              -- serial number
   [3]  = "1.0",                                    -- firmware version
-  [13] = {read = function() return os.time() end}, -- current time
+  [13] = {read = function() return os.time() end,
+          write = function() return  end}, -- current time
 }
 
 local ll = lwm2m.init("testlualwm2mclient", {deviceObj},
@@ -19,7 +20,7 @@ local ll = lwm2m.init("testlualwm2mclient", {deviceObj},
     print ("Send data to", host,port, data) -- log sent data 
   end)
 
-ll:addserver(123, "127.0.0.1", 5684)
+ll:addserver(123, "127.0.0.1", 5683)
 ll:register()
 
 -- set timeout for a non-blocking receivefrom call.

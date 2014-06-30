@@ -2,7 +2,7 @@ local lwm2m = require 'lwm2m'
 local socket = require 'socket'
 
 local udp = socket.udp();
-udp:setsockname('*', 5683)
+udp:setsockname('*', 5682)
 
 local sampleObj = {
   id = 3,
@@ -44,7 +44,7 @@ local sampleObj = {
 local ll = lwm2m.init("testlualwm2mclient", {sampleObj},
   function(data,host,port) udp:sendto(data,host,port) end)
 
-ll:addserver(123, "127.0.0.1",5684)
+ll:addserver(123, "127.0.0.1",5683)
 ll:register()
 
 
